@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suricata Security System</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #e2e8f0; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        header { background: #1e293b; padding: 20px; margin-bottom: 20px; border-radius: 8px; }
+        h1 { font-size: 24px; margin-bottom: 5px; }
+        .status { color: #10b981; font-size: 14px; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #334155; }
+        .tab { padding: 12px 24px; cursor: pointer; background: none; border: none; color: #94a3b8; font-size: 14px; }
+        .tab.active { color: #3b82f6; border-bottom: 2px solid #3b82f6; margin-bottom: -2px; }
+        .tab-content { display: none; background: #1e293b; padding: 20px; border-radius: 8px; }
+        .tab-content.active { display: block; }
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .kpi { background: #334155; padding: 15px; border-radius: 6px; }
+        .kpi-value { font-size: 32px; font-weight: bold; color: #3b82f6; }
+        .kpi-label { font-size: 12px; color: #94a3b8; margin-top: 5px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #334155; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #94a3b8; }
+        .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+        .badge-high { background: #dc2626; color: white; }
+        .badge-medium { background: #f59e0b; color: white; }
+        .badge-low { background: #10b981; color: white; }
+        .event-stream { max-height: 500px; overflow-y: auto; font-family: monospace; font-size: 12px; background: #0f172a; padding: 10px; border-radius: 4px; }
+        .event-line { padding: 4px; border-bottom: 1px solid #1e293b; }
+        .event-alert { background: #7f1d1d; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-size: 14px; color: #94a3b8; }
+        input, select { width: 100%; padding: 10px; background: #334155; border: 1px solid #475569; border-radius: 4px; color: #e2e8f0; }
+        button { padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; }
+        button:hover { background: #2563eb; }
+        .empty-state { text-align: center; padding: 60px 20px; color: #64748b; }
+        .filter-bar { display: flex; gap: 10px; margin-bottom: 15px; }
+        .filter-bar input { flex: 1; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🛡️ Suricata Security System</h1>
+            <div class="status" id="status">● Connecting...</div>
+        </header>
+
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('overview')">Overview</button>
+            <button class="tab" onclick="showTab('live')">Live Events</button>
+            <button class="tab" onclick="showTab('alerts')">Alerts</button>
+            <button class="tab" onclick="showTab('talkers')">Top Talkers</button>
+            <button class="tab" onclick="showTab('mitigation')">Mitigation</button>
+            <button class="tab" onclick="showTab('audit')">Audit</button>
+        </div>
+
+        <div id="overview" class="tab-content active">
+            <div class="kpi-grid">
+                <div class="kpi"><div class="kpi-value" id="kpi-alerts">0</div><div class="kpi-label">Active Alerts</div></div>
+                <div class="kpi"><div class="kpi-value" id="kpi-blocked">0</div><div class="kpi-label">Blocked IPs</div></div>
+                <div class="kpi"><div class="kpi-value" id="kpi-events">0</div><div class="kpi-label">Events/sec</div></div>
+            </div>
+        </div>
+
+        <div id="live" class="tab-content">
+            <div class="filter-bar">
+                <input type="text" id="filter-src" placeholder="Filter by src IP...">
+                <input type="text" id="filter-dst" placeholder="Filter by dst IP...">
+                <select id="filter-type"><option value="">All Types</option><option value="alert">Alerts</option><option value="event">Events</option></select>
+            </div>
+            <div class="event-stream" id="event-stream">
+                <div class="empty-state">Waiting for events...</div>
+            </div>
+        </div>
+
+        <div id="alerts" class="tab-content">
+            <table id="alerts-table">
+                <thead><tr><th>Time</th><th>Severity</th><th>Source IP</th><th>Dest IP</th><th>Reason</th></tr></thead>
+                <tbody><tr><td colspan="5" class="empty-state">No alerts yet</td></tr></tbody>
+            </table>
+        </div>
+
+        <div id="talkers" class="tab-content">
+            <table id="talkers-table">
+                <thead><tr><th>IP Address</th><th>PPS</th><th>Total Packets</th></tr></thead>
+                <tbody><tr><td colspan="3" class="empty-state">No data yet</td></tr></tbody>
+            </table>
+        </div>
+
+        <div id="mitigation" class="tab-content">
+            <div id="login-form">
+                <h3>Login Required</h3>
+                <div class="form-group"><label>Username</label><input type="text" id="username" value="admin"></div>
+                <div class="form-group"><label>Password</label><input type="password" id="password" value="admin"></div>
+                <button onclick="login()">Login</button>
+            </div>
+            <div id="mitigation-panel" style="display:none;">
+                <h3>Block IP</h3>
+                <div class="form-group"><label>IP Address</label><input type="text" id="block-ip" placeholder="192.168.1.100"></div>
+                <div class="form-group"><label>TTL (seconds)</label><input type="number" id="block-ttl" value="300"></div>
+                <div class="form-group"><label>Reason</label><input type="text" id="block-reason" value="Manual block"></div>
+                <button onclick="blockIP()">Block IP</button>
+                <h3 style="margin-top:30px;">Unblock IP</h3>
+                <div class="form-group"><label>IP Address</label><input type="text" id="unblock-ip" placeholder="192.168.1.100"></div>
+                <button onclick="unblockIP()">Unblock IP</button>
+                <h3 style="margin-top:30px;">Blocked IPs</h3>
+                <table id="blocked-table">
+                    <thead><tr><th>IP Address</th><th>Unblock In</th></tr></thead>
+                    <tbody><tr><td colspan="2" class="empty-state">No blocked IPs</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="audit" class="tab-content">
+            <table id="audit-table">
+                <thead><tr><th>Time</th><th>Action</th><th>IP</th><th>Reason</th><th>Actor</th></tr></thead>
+                <tbody><tr><td colspan="5" class="empty-state">No audit entries</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let ws, token = null, eventCount = 0, lastEventTime = Date.now();
+
+        function showTab(name) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById(name).classList.add('active');
+            if (name === 'talkers') loadTopTalkers();
+            if (name === 'alerts') loadAlerts();
+            if (name === 'audit' && token) loadAudit();
+            if (name === 'mitigation' && token) loadBlockedIPs();
+        }
+
+        async function checkHealth() {
+            try {
+                const res = await fetch('/api/health');
+                const data = await res.json();
+                document.getElementById('status').textContent = data.status === 'ok' ? '● Connected' : '● Error';
+            } catch { document.getElementById('status').textContent = '● Disconnected'; }
+        }
+
+        function connectWS() {
+            ws = new WebSocket(`ws://${location.host}/ws`);
+            ws.onopen = () => { document.getElementById('status').textContent = '● Connected'; };
+            ws.onmessage = (e) => {
+                const msg = JSON.parse(e.data);
+                if (msg.type === 'alert') handleAlert(msg);
+                else if (msg.type === 'event') handleEvent(msg);
+                eventCount++;
+            };
+            ws.onclose = () => { document.getElementById('status').textContent = '● Disconnected'; setTimeout(connectWS, 3000); };
+        }
+
+        function handleEvent(evt) {
+            const stream = document.getElementById('event-stream');
+            if (stream.querySelector('.empty-state')) stream.innerHTML = '';
+            const line = document.createElement('div');
+            line.className = 'event-line';
+            line.textContent = `[${evt.timestamp}] ${evt.event_type} ${evt.src_ip || ''} → ${evt.dest_ip || ''}`;
+            stream.insertBefore(line, stream.firstChild);
+            if (stream.children.length > 100) stream.removeChild(stream.lastChild);
+        }
+
+        function handleAlert(alert) {
+            const stream = document.getElementById('event-stream');
+            if (stream.querySelector('.empty-state')) stream.innerHTML = '';
+            const line = document.createElement('div');
+            line.className = 'event-line event-alert';
+            line.textContent = `[ALERT] ${alert.timestamp} ${alert.src_ip} - ${alert.reason}`;
+            stream.insertBefore(line, stream.firstChild);
+            document.getElementById('kpi-alerts').textContent = parseInt(document.getElementById('kpi-alerts').textContent) + 1;
+        }
+
+        async function loadAlerts() {
+            const res = await fetch('/api/alerts');
+            const alerts = await res.json();
+            const tbody = document.querySelector('#alerts-table tbody');
+            if (alerts.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No alerts yet</td></tr>'; return; }
+            tbody.innerHTML = alerts.map(a => `<tr><td>${a.timestamp}</td><td><span class="badge badge-${a.severity}">${a.severity}</span></td><td>${a.src_ip}</td><td>${a.dest_ip || '-'}</td><td>${a.reason}</td></tr>`).join('');
+        }
+
+        async function loadTopTalkers() {
+            const res = await fetch('/api/top-talkers');
+            const talkers = await res.json();
+            const tbody = document.querySelector('#talkers-table tbody');
+            if (talkers.length === 0) { tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No data yet</td></tr>'; return; }
+            tbody.innerHTML = talkers.map(t => `<tr><td>${t.ip}</td><td>${t.pps.toFixed(2)}</td><td>${t.total_packets}</td></tr>`).join('');
+        }
+
+        async function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const res = await fetch('/api/auth/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({username, password}) });
+            if (res.ok) {
+                const data = await res.json();
+                token = data.access_token;
+                document.getElementById('login-form').style.display = 'none';
+                document.getElementById('mitigation-panel').style.display = 'block';
+                loadBlockedIPs();
+            } else alert('Login failed');
+        }
+
+        async function blockIP() {
+            const ip = document.getElementById('block-ip').value;
+            const ttl = parseInt(document.getElementById('block-ttl').value);
+            const reason = document.getElementById('block-reason').value;
+            await fetch('/api/mitigate/block', { method: 'POST', headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`}, body: JSON.stringify({ip, ttl, reason}) });
+            loadBlockedIPs();
+        }
+
+        async function unblockIP() {
+            const ip = document.getElementById('unblock-ip').value;
+            await fetch(`/api/mitigate/unblock?ip=${ip}`, { method: 'POST', headers: {'Authorization': `Bearer ${token}`} });
+            loadBlockedIPs();
+        }
+
+        async function loadBlockedIPs() {
+            const res = await fetch('/api/mitigate/status', { headers: {'Authorization': `Bearer ${token}`} });
+            const status = await res.json();
+            const tbody = document.querySelector('#blocked-table tbody');
+            const ips = Object.entries(status);
+            if (ips.length === 0) { tbody.innerHTML = '<tr><td colspan="2" class="empty-state">No blocked IPs</td></tr>'; document.getElementById('kpi-blocked').textContent = '0'; return; }
+            tbody.innerHTML = ips.map(([ip, data]) => `<tr><td>${ip}</td><td>${data.unblock_in}s</td></tr>`).join('');
+            document.getElementById('kpi-blocked').textContent = ips.length;
+        }
+
+        async function loadAudit() {
+            const res = await fetch('/api/audit', { headers: {'Authorization': `Bearer ${token}`} });
+            const audit = await res.json();
+            const tbody = document.querySelector('#audit-table tbody');
+            if (audit.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No audit entries</td></tr>'; return; }
+            tbody.innerHTML = audit.map(a => `<tr><td>${a.timestamp}</td><td>${a.action}</td><td>${a.ip}</td><td>${a.reason}</td><td>${a.actor}</td></tr>`).join('');
+        }
+
+        setInterval(() => {
+            const now = Date.now();
+            const eps = eventCount / ((now - lastEventTime) / 1000);
+            document.getElementById('kpi-events').textContent = eps.toFixed(1);
+            eventCount = 0;
+            lastEventTime = now;
+        }, 5000);
+
+        checkHealth();
+        connectWS();
+        setInterval(checkHealth, 10000);
+    </script>
+</body>
+</html>
