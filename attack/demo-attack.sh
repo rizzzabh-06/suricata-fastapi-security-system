@@ -4,7 +4,7 @@
 
 TARGET=${1:-"http://localhost:8000"}
 
-echo "🎯 Starting Attack Demonstration"
+echo " Starting Attack Demonstration"
 echo "Target: $TARGET"
 echo "================================"
 echo ""
@@ -37,7 +37,7 @@ for i in {1..5}; do
 done
 
 echo "Phase 5: HIGH VOLUME FLOOD (200 req/sec for 10 sec)"
-echo "  ⚠️  This will trigger PPS threshold alert!"
+echo "  This will trigger PPS threshold alert!"
 for sec in {1..10}; do
     for i in {1..200}; do
         curl -s "$TARGET/api/health" > /dev/null &
@@ -49,7 +49,7 @@ done
 wait
 
 echo ""
-echo "✅ Attack demonstration complete!"
+echo "Attack demonstration complete!"
 echo "Check dashboard at $TARGET for:"
 echo "  - Alerts in Alerts tab"
 echo "  - High PPS in Top Talkers"
